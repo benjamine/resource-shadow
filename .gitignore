@@ -1,0 +1,14 @@
+# Dependency directory
+node_modules
+
+/nbproject/*
+.DS_Store
+.dropbox
+.grunt
+# Logs
+logs
+*.log
+
+coverage
+
+.idea/*
