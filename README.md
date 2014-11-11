@@ -1,11 +1,18 @@
 ResourceShadow
 ==============
 
+[![Build Status](https://secure.travis-ci.org/benjamine/resource-shadow.png)](http://travis-ci.org/benjamine/resource-shadow)
+[![Code Climate](https://codeclimate.com/github/benjamine/resource-shadow/badges/gpa.svg)](https://codeclimate.com/github/benjamine/resource-shadow)
+[![Test Coverage](https://codeclimate.com/github/benjamine/resource-shadow/badges/coverage.svg)](https://codeclimate.com/github/benjamine/resource-shadow)
+[![NPM version](https://badge.fury.io/js/resource-shadow.png)](http://badge.fury.io/js/resource-shadow)
+[![NPM dependencies](https://david-dm.org/benjamine/resource-shadow.png)](https://david-dm.org/benjamine/resource-shadow)
+[![Bower version](https://badge.fury.io/bo/resource-shadow.png)](http://badge.fury.io/bo/resource-shadow)
+
 keep a synchronized copy of a remote http resource.
 Modify freely and changes will be synced in the background automatically.
 
 - modify the local copy without blocking I/O (don't make user wait for your server responses)
-- localStorage is used to keep sync with other frames/tabs/windows in same domain
+- localStorage is used to keep realtime sync with other frames/tabs/windows in same domain
 - saving/loading to remote http server is done in the background
 - works in offline mode (using only localStorage), switching to online mode at any time
 - custom 3-way merge is supported (used when both local and server versions were modified)

@@ -9,6 +9,7 @@ function ResourceShadow(options) {
   this.httpHandler = options.httpHandler ||
     (defaultHttpHandler = defaultHttpHandler || require('./http-handler'));
   this.load();
+  this.listenForStorageEvent();
 }
 
 microee.mixin(ResourceShadow);
@@ -76,7 +77,11 @@ ResourceShadow.prototype.loadAndRebase = function() {
 
 ResourceShadow.prototype.load = function(preJson) {
 
-  this.data = this.getLocalStorageValue();
+  var currentDataJson = this.stringify(this.data);
+  if (this.localStorage.getItem(this.localKey) !== currentDataJson) {
+    this.data = this.getLocalStorageValue();
+    this.onChange();
+  }
 
   if (this.loading || this.saving) {
     // changes will be detected at the end of current process
@@ -146,6 +151,36 @@ ResourceShadow.prototype.processJsonFromServer = function(serverJson, preJson) {
   }
 };
 
+ResourceShadow.prototype.listenForStorageEvent = function() {
+  if (this.listeningForStorageEvent) {
+    return;
+  }
+
+  if (!process.browser) {
+    return;
+  }
+
+  function addEventListener(el, eventName, handler) {
+    if (el.addEventListener) {
+      el.addEventListener(eventName, handler, false);
+    } else if (el.attachEvent) {
+      el.attachEvent('on' + eventName, function(){
+        handler.apply(el, arguments);
+      });
+    }
+  }
+
+  var self = this;
+  var handler = function(e) {
+    if (e.key === self.localKey) {
+      self.load();
+    }
+  };
+
+  addEventListener(window, 'storage', handler);
+  this.listeningForStorageEvent = true;
+};
+
 ResourceShadow.prototype.threeWayMerge = function(original, server, local) {
   if (this.options.threeWayMerge) {
     return this.options.threeWayMerge.call(this, original, server, local);
@@ -167,7 +202,7 @@ ResourceShadow.prototype.httpHeaders = function() {
 };
 
 ResourceShadow.prototype.onChange = function() {
-  this.emit('change');
+  this.emit('change', this.data);
 };
 
 ResourceShadow.prototype.onSaved = function() {
@@ -244,11 +279,15 @@ ResourceShadow.prototype.setLocalStorageValue = function(data) {
       json = null;
     }
   }
-  if (json === null) {
-    this.localStorage.removeItem(this.localKey);
-  } else {
-    this.localStorage.setItem(this.localKey, json);
+  var previousJson = this.localStorage.getItem(this.localKey);
+  if (previousJson !== json) {
+    if (json === null) {
+      this.localStorage.removeItem(this.localKey);
+    } else {
+      this.localStorage.setItem(this.localKey, json);
+    }
   }
+
   return json;
 };
 
