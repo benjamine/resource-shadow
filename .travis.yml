@@ -15,4 +15,4 @@ addons:
       # # get your token from https://codeclimate.com/github/owner/reponame
       # gem install travis
       # travis encrypt <projecttoken>
-      secure: "project's encrypted token"
+      secure: "EdrSddYhkYMcBZE+nkzOYapIQ5Hmx8kqhd5B7gIWHe6Z+6c2oCwW85BApQpeaQImYOB6VPyEPeqrlcE393M+tJmwZ2iwuRDZhm1fwlm2pNLbNbp23djQQ1M/UQ/sR8uwhI0TyFHcntBDiez1a941UCTERWduJu79wLZmegZ9DAw="
