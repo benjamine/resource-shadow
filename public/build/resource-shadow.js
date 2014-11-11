@@ -9,7 +9,7 @@ exports.create = ResourceShadow.create;
 
 if (process.browser) {
   // exports only for browser bundle
-  exports.version = '1.0.0';
+  exports.version = '0.0.1';
   exports.homepage = ',';
 } else {
   // exports only for node.js
