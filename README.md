@@ -11,12 +11,12 @@ ResourceShadow
 keep a synchronized copy of a remote http resource.
 Modify freely and changes will be synced in the background automatically.
 
-- modify the local copy without blocking I/O (don't make user wait for your server responses)
+- modify the local copy without blocking I/O (don't make users wait for a server response)
 - localStorage is used to keep realtime sync with other frames/tabs/windows in same domain
 - saving/loading to remote http server is done in the background
-- works in offline mode (using only localStorage), switching to online mode at any time
+- works in offline mode (only localStorage), switch to online mode (http) at any time
 - custom 3-way merge is supported (used when both local and server versions were modified)
-- retries (with a delay) on timeout or network errors
+- retries (with a delay) on timeout or other network errors
 
 Usage
 -----
@@ -78,3 +78,5 @@ Supported Platforms
 ---------
 
 - IE9+ and modern browsers
+
+visit [test page](http://benjamine.github.io/resource-shadow/test/index.html) to test your current browser.
