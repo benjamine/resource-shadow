@@ -11,6 +11,7 @@
     "cover-publish": "istanbul cover _mocha --report lcovonly && codeclimate < coverage/lcov.info"
   },
   "author": "Benjamin Eidelman <beneidel@gmail.com>",
+  "homepage": "https://github.com/benjamine/resource-shadow",
   "license": "MIT",
   "repository": {
     "type": "git",
