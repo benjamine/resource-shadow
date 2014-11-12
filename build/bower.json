@@ -1,0 +1,24 @@
+{
+  "name": "resource-shadow",
+  "description": "",
+  "main": "resource-shadow.js",
+  "license": "MIT",
+  "authors": [
+    "Benjamin Eidelman <beneidel@gmail.com>"
+  ],
+  "repository": {
+    "type": "",
+    "url": ""
+  },
+  "keywords": [
+    ""
+  ],
+  "ignore": [
+    "test",
+    "demo",
+    "docs",
+    ".travis.yml",
+    "karma.conf.js",
+    "gulpfile.js"
+  ]
+}
