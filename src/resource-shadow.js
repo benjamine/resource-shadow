@@ -1,15 +1,21 @@
 var microee = require('microee');
 var defaultHttpHandler;
+var defaultLocalStorageObserver;
 
 function ResourceShadow(options) {
+  this.data = {};
   this.localKey = options.localKey;
   this.url = options.url;
   this.options = options;
   this.localStorage = options.localStorage || localStorage;
+  this.localStorageObserver = options.localStorageObserver ||
+    (defaultLocalStorageObserver = defaultLocalStorageObserver || require('./local-storage-observer'));
   this.httpHandler = options.httpHandler ||
     (defaultHttpHandler = defaultHttpHandler || require('./http-handler'));
   this.load();
-  this.listenForStorageEvent();
+  if (this.localStorageObserver) {
+    this.listenForStorageEvent();
+  }
 }
 
 microee.mixin(ResourceShadow);
@@ -19,23 +25,27 @@ ResourceShadow.create = function resourceCreate(options) {
 };
 
 ResourceShadow.prototype.apply = function resourceChangeApply(changeFn) {
-  var data = this.beforeApply();
+  this.beforeApply();
   try {
-    data = changeFn(data) || data;
+    if (typeof changeFn === 'object') {
+      this.mirrorObject(changeFn, this.data);
+    } else {
+      changeFn.call(this, this.data);
+    }
   } finally {
-    this.afterApply(data);
+    this.afterApply();
     return this;
   }
 };
 
 ResourceShadow.prototype.beforeApply = function() {
-  return this.getLocalStorageValue();
+  this.mirrorObject(this.getLocalStorageValue(), this.data);
 };
 
-ResourceShadow.prototype.afterApply = function(data) {
-  this.setLocalStorageValue(data);
-  this.data = data;
+ResourceShadow.prototype.afterApply = function() {
+  this.setLocalStorageValue(this.data);
   this.save();
+  // TODO: call only if there are real changes
   this.onChange();
 };
 
@@ -75,13 +85,18 @@ ResourceShadow.prototype.loadAndRebase = function() {
   return this.load({});
 };
 
-ResourceShadow.prototype.load = function(preJson) {
-
+ResourceShadow.prototype.loadLocal = function() {
   var currentDataJson = this.stringify(this.data);
   if (this.localStorage.getItem(this.localKey) !== currentDataJson) {
-    this.data = this.getLocalStorageValue();
+    this.mirrorObject(this.getLocalStorageValue(), this.data);
+    // TODO: call only if there are real changes
     this.onChange();
   }
+};
+
+ResourceShadow.prototype.load = function(preJson) {
+
+  this.loadLocal();
 
   if (this.loading || this.saving) {
     // changes will be detected at the end of current process
@@ -134,12 +149,18 @@ ResourceShadow.prototype.processJsonFromServer = function(serverJson, preJson) {
       saveAgain = serverJson !== this.shadow;
     }
 
-    try  {
-      this.data = this.parse(serverJson);
+    var serverData;
+    try {
+      serverData = this.parse(serverJson);
     } catch (err) {
-      this.data = null;
+      serverData = null;
     }
+    if (typeof serverData === 'object') {
+      this.mirrorObject(serverData, this.data);
+    }
+
     this.setLocalStorageValue(this.data);
+    // TODO: call only if there are real changes
     this.onChange();
 
     if (saveAgain) {
@@ -152,33 +173,55 @@ ResourceShadow.prototype.processJsonFromServer = function(serverJson, preJson) {
 };
 
 ResourceShadow.prototype.listenForStorageEvent = function() {
-  if (this.listeningForStorageEvent) {
+  if (this.listeningForStorageEvent || !this.localStorageObserver) {
     return;
   }
-
-  if (!process.browser) {
-    return;
-  }
-
-  function addEventListener(el, eventName, handler) {
-    if (el.addEventListener) {
-      el.addEventListener(eventName, handler, false);
-    } else if (el.attachEvent) {
-      el.attachEvent('on' + eventName, function(){
-        handler.apply(el, arguments);
-      });
-    }
-  }
-
   var self = this;
-  var handler = function(e) {
-    if (e.key === self.localKey) {
-      self.load();
+  this.localStorageObserver.onKeyChange(this.localKey, function(){
+    if (this.settingLocalStorage) {
+      return;
     }
-  };
-
-  addEventListener(window, 'storage', handler);
+    self.loadLocal();
+  });
   this.listeningForStorageEvent = true;
+};
+
+ResourceShadow.prototype.mirrorObject = function(source, target) {
+  var self = this;
+  if (typeof source !== 'object' || typeof target !== 'object') {
+    return;
+  }
+
+  function copyMember(source, target, key) {
+    var sourceValue = source[key];
+    var targetValue = target[key];
+    if (typeof targetValue !== 'undefined' &&
+      typeof sourceValue === 'object' &&
+      typeof targetValue === 'object' &&
+      (sourceValue instanceof Array) === (targetValue instanceof Array)) {
+      self.mirrorObject(sourceValue, targetValue);
+      return;
+    }
+    target[key] = sourceValue;
+  }
+
+  if (source instanceof Array && target instanceof Array) {
+    var sourceLength = source.length;
+    for (var i = 0; i < sourceLength; i++) {
+      copyMember(source, target, i);
+    }
+    target.length = source.length;
+    return;
+  }
+
+  for (var name in source) {
+    copyMember(source, target, name);
+  }
+  for (name in target) {
+    if (typeof source[name] === 'undefined') {
+      delete target[name];
+    }
+  }
 };
 
 ResourceShadow.prototype.threeWayMerge = function(original, server, local) {
@@ -259,12 +302,12 @@ ResourceShadow.prototype.setUrl = function(url, headers) {
 ResourceShadow.prototype.getLocalStorageValue = function() {
   var json = this.localStorage.getItem(this.localKey);
   if (json === null || typeof json === 'undefined' || json === '') {
-    return null;
+    return {};
   }
   try {
-    return this.parse(json);
+    return this.parse(json) || {};
   } catch (err) {
-    return null;
+    return {};
   }
 };
 
@@ -280,12 +323,17 @@ ResourceShadow.prototype.setLocalStorageValue = function(data) {
     }
   }
   var previousJson = this.localStorage.getItem(this.localKey);
-  if (previousJson !== json) {
-    if (json === null) {
-      this.localStorage.removeItem(this.localKey);
-    } else {
-      this.localStorage.setItem(this.localKey, json);
+  this.settingLocalStorage = true;
+  try {
+    if (previousJson !== json) {
+      if (json === null) {
+        this.localStorage.removeItem(this.localKey);
+      } else {
+        this.localStorage.setItem(this.localKey, json);
+      }
     }
+  } finally {
+    this.settingLocalStorage = false;
   }
 
   return json;
