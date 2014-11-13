@@ -14,9 +14,11 @@ describe('resourceShadow', function() {
   beforeEach(function() {
     this.resourceUrl = 'https://localhost:8181/test-resource1';
     this.resourceLocalKey = 'test-resource1';
+    var storage = new MockLocalStorage();
     this.resource = resourceShadow.create({
       localKey: this.resourceLocalKey,
-      localStorage: new MockLocalStorage(),
+      localStorage: storage,
+      localStorageObserver: storage,
       httpHandler: new MockHttpHandler(),
       retryDelay: 2,
     });
@@ -50,16 +52,14 @@ describe('resourceShadow', function() {
   });
 
   when('starts offline', function() {
-    it('value is undefined', function() {
-      expect(this.resource.value).to.be(undefined);
+    it('initial data is empty object', function() {
+      expect(this.resource.data).to.eql({});
     });
 
     when('setting a first value', function() {
       beforeEach(function() {
         var firstValue = this.firstValue = { aNewProperty: 'and new value' };
-        this.resource.apply(function() {
-          return firstValue;
-        });
+        this.resource.apply(firstValue);
       });
       it('gets saved to local storage', function() {
         var found = JSON.parse(this.resource.localStorage.values[this.resourceLocalKey]);
@@ -74,9 +74,7 @@ describe('resourceShadow', function() {
     when('modifying the value', function() {
       beforeEach(function() {
         var firstValue = this.firstValue = { aNewProperty: 'and new value' };
-        this.resource.apply(function() {
-          return firstValue;
-        });
+        this.resource.apply(firstValue);
         this.resource.apply(function(data) {
           data.aSecondProperty = 'a second value';
         });
@@ -95,23 +93,62 @@ describe('resourceShadow', function() {
           aSecondProperty: 'a second value'
         });
       });
+      it('references are kept', function() {
+
+        this.originalValue = {
+          aSecondProperty: 'a second value',
+          aThirdOne: 'the value',
+          moreData: {
+            items: [
+              { name: 'Santos' },
+              { name: 'Dupont' }
+            ]
+          }
+        };
+
+        this.resource.apply(this.originalValue);
+
+        var originalData = this.resource.data;
+        var originalItems = this.resource.data.moreData.items;
+
+        this.modifiedValue = {
+          aSecondProperty: 'a second value',
+          addedProperty: 'an added value',
+          moreData: {
+            items: [
+              { name: 'Mario Santos' },
+              { name: 'Dupont' },
+              { name: 'Cozzetti'}
+            ]
+          }
+        };
+
+        this.resource.apply(this.modifiedValue);
+
+        var found = this.resource.data;
+        expect(found).to.eql(this.modifiedValue);
+
+        expect(found).to.eql(this.modifiedValue);
+
+        // objects are the same
+        expect(found).to.be(originalData);
+        expect(found.moreData.items).to.be(originalItems);
+
+      });
     });
 
     when('the value is also modified in a same-domain frame', function() {
       beforeEach(function() {
         var firstValue = this.firstValue = { aNewProperty: 'and new value' };
-        this.resource.apply(function() {
-          return firstValue;
-        });
+        this.resource.apply(firstValue);
 
         // change done in another same-domain frame (eg. another tab or window)
-        var otherFrameValue = JSON.parse(this.resource.localStorage.values[this.resourceLocalKey]);
+        var otherFrameValue = JSON.parse(this.resource.localStorage.getItem(this.resourceLocalKey));
         otherFrameValue.addedInAnotherFrame = 'some value';
-        this.resource.localStorage.values[this.resourceLocalKey] = JSON.stringify(otherFrameValue);
+        this.resource.localStorage.setItem(this.resourceLocalKey, JSON.stringify(otherFrameValue));
 
       });
-      it('new version gets loaded using .load()', function() {
-        this.resource.load();
+      it('new version gets loaded automatically', function() {
         expect(this.resource.data).to.eql({
           aNewProperty: 'and new value',
           addedInAnotherFrame: 'some value'
@@ -154,10 +191,7 @@ describe('resourceShadow', function() {
           });
 
           self.localValue = { iAddedThisLocally: 'while loading from server' };
-          this.resource.apply(function() {
-            return self.localValue;
-          });
-
+          this.resource.apply(self.localValue);
         });
         it('3-way merge is used', function() {
           expect(this.resource.threeWayMergeCalledWith).to.eql({
@@ -228,12 +262,8 @@ describe('resourceShadow', function() {
         this.serverValue = { propertySetOnServer: 'server-side value' };
         this.resource.httpHandler.resources[this.resourceUrl] = JSON.stringify(this.serverValue);
 
-        var self = this;
-
         this.localValue = { iAddedThisLocally: 'before loading from server' };
-        this.resource.apply(function() {
-          return self.localValue;
-        });
+        this.resource.apply(this.localValue);
 
         this.resource.setUrl(this.resourceUrl).loadAndRebase().once('loaded', function() {
           done();
