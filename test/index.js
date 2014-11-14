@@ -170,7 +170,7 @@ describe('resourceShadow', function() {
       beforeEach(function() {
         this.serverValue = { propertySetOnServer: 'server-side value' };
         this.resource.httpHandler.resources[this.resourceUrl] = JSON.stringify(this.serverValue);
-        this.resource.setUrl(this.resourceUrl);
+        this.resource.goOnline(this.resourceUrl);
       });
       when('load is complete', function() {
         beforeEach(function(done) {
@@ -265,7 +265,7 @@ describe('resourceShadow', function() {
         this.localValue = { iAddedThisLocally: 'before loading from server' };
         this.resource.apply(this.localValue);
 
-        this.resource.setUrl(this.resourceUrl).loadAndRebase().once('loaded', function() {
+        this.resource.goOnline(this.resourceUrl).loadAndRebase().once('loaded', function() {
           done();
         });
       });
@@ -290,7 +290,7 @@ describe('resourceShadow', function() {
     beforeEach(function(done) {
       this.serverValue = { propertySetOnServer: 'server-side value' };
       this.resource.httpHandler.resources[this.resourceUrl] = JSON.stringify(this.serverValue);
-      this.resource.setUrl(this.resourceUrl).load().once('loaded', function() {
+      this.resource.goOnline(this.resourceUrl).load().once('loaded', function() {
         done();
       });
     });
@@ -377,7 +377,7 @@ describe('resourceShadow', function() {
       });
       it('resource is back to initial state', function() {
         expect(this.resource.data).to.eql({});
-        expect(this.resource.url).to.be(null);
+        expect(this.resource.online).to.be(false);
         expect(this.saving).to.not.be(true);
         expect(this.loading).to.not.be(true);
       });
@@ -402,7 +402,7 @@ describe('resourceShadow', function() {
         var self = this;
         this.resource.on('serverresponsediscarded', function(){
           expect(self.resource.data).to.eql({});
-          expect(self.resource.url).to.be(null);
+          expect(self.resource.online).to.be(false);
           done();
         });
       });
@@ -419,7 +419,7 @@ describe('resourceShadow', function() {
         var self = this;
         this.resource.on('serverresponsediscarded', function(){
           expect(self.resource.data).to.eql({});
-          expect(self.resource.url).to.be(null);
+          expect(self.resource.online).to.be(false);
           done();
         });
       });

@@ -36,7 +36,7 @@ Usage
   // change was immediately persisted to localStorage
 
   // go online
-  preferences.setUrl('http://myhost/user/' + currentUser.id + '/preferences').load();
+  preferences.goOnline('http://myhost/user/' + currentUser.id + '/preferences').load();
 
   // value from server is loading
 

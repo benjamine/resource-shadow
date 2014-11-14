@@ -7,6 +7,8 @@ function ResourceShadow(options) {
   this.localKey = options.localKey;
   this.url = options.url;
   this.options = options;
+  this.online = options.online === true ||
+    ((!!options.url) && options.online !== false);
   this.localStorage = options.localStorage || localStorage;
   this.localStorageObserver = options.localStorageObserver ||
     (defaultLocalStorageObserver = defaultLocalStorageObserver || require('./local-storage-observer'));
@@ -62,8 +64,7 @@ ResourceShadow.prototype.save = function() {
     return;
   }
 
-  if (!this.url) {
-    // no remote url for this resource
+  if (!this.online || !this.url) {
     this.onSaved();
     return;
   }
@@ -117,7 +118,7 @@ ResourceShadow.prototype.load = function(preJson) {
     // changes will be detected at the end of current process
     return this;
   }
-  if (!this.url) {
+  if (!this.online || !this.url) {
     // no remote url for this resource
     this.onLoaded();
     return this;
@@ -330,11 +331,14 @@ ResourceShadow.prototype.onLoadError = function(err) {
   this.emit('loaderror', err);
 };
 
-ResourceShadow.prototype.setUrl = function(url, headers) {
-  this.url = url;
+ResourceShadow.prototype.goOnline = function(url, headers) {
+  if (url) {
+    this.url = url;
+  }
   if (headers) {
     this.options.headers = headers;
   }
+  this.online = true;
   return this;
 };
 
@@ -342,7 +346,7 @@ ResourceShadow.prototype.reset = function(data) {
   if (this.loading || this.saving) {
     this.discardNextServerResponse = true;
   }
-  this.url = null;
+  this.online = false;
   this.mirrorObject(data || {}, this.data);
   this.setLocalStorageValue(this.data);
   this.onChange({
