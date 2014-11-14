@@ -371,6 +371,60 @@ describe('resourceShadow', function() {
       });
     });
 
+    when('reset', function() {
+      beforeEach(function() {
+        this.resource.reset();
+      });
+      it('resource is back to initial state', function() {
+        expect(this.resource.data).to.eql({});
+        expect(this.resource.url).to.be(null);
+        expect(this.saving).to.not.be(true);
+        expect(this.loading).to.not.be(true);
+      });
+    });
+
+    when('reset to specific value', function() {
+      beforeEach(function() {
+        this.resetValue = { recentReset: true };
+        this.resource.reset(this.resetValue);
+      });
+      it('data matches the specified value', function() {
+        expect(this.resource.data).to.eql(this.resetValue);
+      });
+    });
+
+    when('reset while loading', function() {
+      beforeEach(function() {
+        this.resource.load();
+        this.resource.reset();
+      });
+      it('server response is ignored', function(done) {
+        var self = this;
+        this.resource.on('serverresponsediscarded', function(){
+          expect(self.resource.data).to.eql({});
+          expect(self.resource.url).to.be(null);
+          done();
+        });
+      });
+    });
+
+    when('reset while saving', function() {
+      beforeEach(function() {
+        this.resource.apply(function(data){
+          data.thisWillNever = 'get saved';
+        });
+        this.resource.reset();
+      });
+      it('server response is ignored', function(done) {
+        var self = this;
+        this.resource.on('serverresponsediscarded', function(){
+          expect(self.resource.data).to.eql({});
+          expect(self.resource.url).to.be(null);
+          done();
+        });
+      });
+    });
+
   });
 
 });

@@ -25,6 +25,9 @@ Usage
   // will load it from localStorage if exists
   var preferences = resourceShadow.create({ localKey: 'preferences'});
 
+  // set initial value
+  preferences.apply({ color = 'white' });
+
   // make changes offline using .apply (no async callbacks!)
   preferences.apply(function(data){
     data.color = 'red';
@@ -65,13 +68,32 @@ Usage
 
   // using load and "rebase"
   var preferences = resourceShadow.create({ localKey: 'preferences2'});
-  preferences.apply(function(){
-    return { someInitialLocal: 'values' }
-  });
+  preferences.apply({ someInitialLocal: 'values' });
 
   // will load server value, and apply local value on top of it (using 3 way merge)
   // the result will be as if local version were created *after* (or on top) of server version
   preferences.loadAndRebase();
+
+  // reset to initial state (and go offline)
+  preferences.reset();
+
+  // listen for changes
+  preferences.on('change', function(data, info){
+    if (info.source === 'localStorageEvent') {
+      console.log('a change arrived from another tab/frame/window');
+    } else if (info.source === 'apply') {
+      console.log('a change was just applied locally');
+    } else if (info.source === 'server') {
+      console.log('a change was loaded from server');
+    } else if (info.source === 'localStorage') {
+      console.log('a change was found at localStorage');
+    }
+  });
+
+  preferences.on('saved', function(){
+    console.log('changes were saved to the server');
+  });
+
 ```
 
 Supported Platforms

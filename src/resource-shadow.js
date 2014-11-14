@@ -25,7 +25,7 @@ ResourceShadow.create = function resourceCreate(options) {
 };
 
 ResourceShadow.prototype.apply = function resourceChangeApply(changeFn) {
-  this.beforeApply();
+  var previousJson = this.beforeApply();
   try {
     if (typeof changeFn === 'object') {
       this.mirrorObject(changeFn, this.data);
@@ -33,20 +33,27 @@ ResourceShadow.prototype.apply = function resourceChangeApply(changeFn) {
       changeFn.call(this, this.data);
     }
   } finally {
-    this.afterApply();
+    this.afterApply(previousJson);
     return this;
   }
 };
 
 ResourceShadow.prototype.beforeApply = function() {
+  var json = this.localStorage.getItem(this.localKey);
   this.mirrorObject(this.getLocalStorageValue(), this.data);
+  return json;
 };
 
-ResourceShadow.prototype.afterApply = function() {
+ResourceShadow.prototype.afterApply = function(previousJson) {
   this.setLocalStorageValue(this.data);
   this.save();
-  // TODO: call only if there are real changes
-  this.onChange();
+
+  var json = this.localStorage.getItem(this.localKey);
+  if (json !== previousJson) {
+    this.onChange({
+      source: 'apply'
+    });
+  }
 };
 
 ResourceShadow.prototype.save = function() {
@@ -54,7 +61,7 @@ ResourceShadow.prototype.save = function() {
     // changes will be detected at the end of current process
     return;
   }
-  this.saveRequested = false;
+
   if (!this.url) {
     // no remote url for this resource
     this.onSaved();
@@ -67,6 +74,11 @@ ResourceShadow.prototype.save = function() {
     var self = this;
     this.httpHandler.put(this.url, this.httpHeaders(), json, function(err, serverJson) {
       self.saving = false;
+      if (self.discardNextServerResponse) {
+        self.discardNextServerResponse = false;
+        self.emit('serverresponsediscarded');
+        return;
+      }
       if (err) {
         self.onSaveError(err);
         return;
@@ -85,12 +97,15 @@ ResourceShadow.prototype.loadAndRebase = function() {
   return this.load({});
 };
 
-ResourceShadow.prototype.loadLocal = function() {
+ResourceShadow.prototype.loadLocal = function(changeInfo) {
   var currentDataJson = this.stringify(this.data);
   if (this.localStorage.getItem(this.localKey) !== currentDataJson) {
-    this.mirrorObject(this.getLocalStorageValue(), this.data);
-    // TODO: call only if there are real changes
-    this.onChange();
+    var changed = this.mirrorObject(this.getLocalStorageValue(), this.data);
+    if (changed) {
+      changeInfo = changeInfo || {};
+      changeInfo.source = changeInfo.source || 'localStorage';
+      this.onChange(changeInfo);
+    }
   }
 };
 
@@ -122,6 +137,11 @@ ResourceShadow.prototype.load = function(preJson) {
   var self = this;
   this.httpHandler.get(this.url, this.httpHeaders(), function(err, serverJson) {
     self.loading = false;
+    if (self.discardNextServerResponse) {
+      self.emit('serverresponsediscarded');
+      self.discardNextServerResponse = false;
+      return;
+    }
     if (err) {
       err.loadArguments = [preJson];
       self.onLoadError(err);
@@ -135,38 +155,43 @@ ResourceShadow.prototype.load = function(preJson) {
 
 ResourceShadow.prototype.processJsonFromServer = function(serverJson, preJson) {
   this.shadow = serverJson;
-  var newJson = this.localStorage.getItem(this.localKey);
+  var currentLocalJson = this.localStorage.getItem(this.localKey);
 
   if (serverJson !== preJson) {
     // server changes
     var saveAgain = false;
-    if (preJson !== newJson) {
+    if (preJson !== currentLocalJson) {
       // conflict! both server and local changes happened
-      serverJson = this.threeWayMerge(preJson, serverJson, newJson);
+      serverJson = this.threeWayMerge(preJson, serverJson, currentLocalJson);
       if (typeof serverJson === 'object') {
         serverJson = this.stringify(serverJson);
       }
       saveAgain = serverJson !== this.shadow;
     }
 
-    var serverData;
-    try {
-      serverData = this.parse(serverJson);
-    } catch (err) {
-      serverData = null;
+    if (serverJson !== currentLocalJson) {
+      var serverData;
+      var changed = true;
+      try {
+        serverData = this.parse(serverJson);
+      } catch (err) {
+        serverData = null;
+      }
+      if (typeof serverData === 'object') {
+        changed = this.mirrorObject(serverData, this.data);
+      }
+      if (changed) {
+        this.setLocalStorageValue(this.data);
+        this.onChange({
+          source: 'server'
+        });
+      }
     }
-    if (typeof serverData === 'object') {
-      this.mirrorObject(serverData, this.data);
-    }
-
-    this.setLocalStorageValue(this.data);
-    // TODO: call only if there are real changes
-    this.onChange();
 
     if (saveAgain) {
       this.save();
     }
-  } else if (preJson !== newJson) {
+  } else if (preJson !== currentLocalJson) {
     // only local changes, start a new save
     this.save();
   }
@@ -181,7 +206,9 @@ ResourceShadow.prototype.listenForStorageEvent = function() {
     if (this.settingLocalStorage) {
       return;
     }
-    self.loadLocal();
+    self.loadLocal({
+      source: 'localStorageEvent'
+    });
   });
   this.listeningForStorageEvent = true;
 };
@@ -189,39 +216,51 @@ ResourceShadow.prototype.listenForStorageEvent = function() {
 ResourceShadow.prototype.mirrorObject = function(source, target) {
   var self = this;
   if (typeof source !== 'object' || typeof target !== 'object') {
-    return;
+    return false;
   }
-
+  var changed = false;
   function copyMember(source, target, key) {
     var sourceValue = source[key];
     var targetValue = target[key];
+    if (targetValue === sourceValue) {
+      return false;
+    }
     if (typeof targetValue !== 'undefined' &&
       typeof sourceValue === 'object' &&
       typeof targetValue === 'object' &&
       (sourceValue instanceof Array) === (targetValue instanceof Array)) {
-      self.mirrorObject(sourceValue, targetValue);
-      return;
+      return self.mirrorObject(sourceValue, targetValue);
     }
     target[key] = sourceValue;
+    return true;
   }
 
   if (source instanceof Array && target instanceof Array) {
     var sourceLength = source.length;
     for (var i = 0; i < sourceLength; i++) {
-      copyMember(source, target, i);
+      if (copyMember(source, target, i)) {
+        changed = true;
+      }
     }
-    target.length = source.length;
-    return;
+    if (target.length !== source.length) {
+      target.length = source.length;
+      changed = true;
+    }
+    return changed;
   }
 
   for (var name in source) {
-    copyMember(source, target, name);
+    if (copyMember(source, target, name)) {
+      changed = true;
+    }
   }
   for (name in target) {
     if (typeof source[name] === 'undefined') {
       delete target[name];
+      changed = true;
     }
   }
+  return changed;
 };
 
 ResourceShadow.prototype.threeWayMerge = function(original, server, local) {
@@ -244,8 +283,8 @@ ResourceShadow.prototype.httpHeaders = function() {
   return this.options.headers;
 };
 
-ResourceShadow.prototype.onChange = function() {
-  this.emit('change', this.data);
+ResourceShadow.prototype.onChange = function(changeInfo) {
+  this.emit('change', this.data, changeInfo);
 };
 
 ResourceShadow.prototype.onSaved = function() {
@@ -298,6 +337,20 @@ ResourceShadow.prototype.setUrl = function(url, headers) {
   }
   return this;
 };
+
+ResourceShadow.prototype.reset = function(data) {
+  if (this.loading || this.saving) {
+    this.discardNextServerResponse = true;
+  }
+  this.url = null;
+  this.mirrorObject(data || {}, this.data);
+  this.setLocalStorageValue(this.data);
+  this.onChange({
+    source: 'reset'
+  });
+  return this;
+};
+
 
 ResourceShadow.prototype.getLocalStorageValue = function() {
   var json = this.localStorage.getItem(this.localKey);
