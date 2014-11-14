@@ -9,7 +9,7 @@ exports.create = ResourceShadow.create;
 
 if (process.browser) {
   // exports only for browser bundle
-  exports.version = '0.0.7';
+  exports.version = '0.0.8';
   exports.homepage = 'https://github.com/benjamine/resource-shadow';
 } else {
   // exports only for node.js
