@@ -59,4 +59,8 @@ HttpHandler.prototype.put = function(url, headers, body, callback) {
   return this.ajax('PUT', url, headers, body, callback);
 };
 
+HttpHandler.prototype.post = function(url, headers, body, callback) {
+  return this.ajax('POST', url, headers, body, callback);
+};
+
 module.exports = new HttpHandler();

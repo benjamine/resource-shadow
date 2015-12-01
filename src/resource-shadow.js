@@ -9,6 +9,7 @@ function ResourceShadow(options) {
   this.options = options;
   this.online = options.online === true ||
     ((!!options.url) && options.online !== false);
+  this.saveMethod = /^post$/i.test(options.saveMethod) ? 'post' : 'put';
   this.localStorage = options.localStorage || localStorage;
   this.localStorageObserver = options.localStorageObserver ||
     (defaultLocalStorageObserver = defaultLocalStorageObserver || require('./local-storage-observer'));
@@ -73,7 +74,7 @@ ResourceShadow.prototype.save = function() {
     // we have changes to save
     this.saving = true;
     var self = this;
-    this.httpHandler.put(this.url, this.httpHeaders(), json, function(err, serverJson) {
+    this.httpHandler[this.saveMethod](this.url, this.httpHeaders(), json, function(err, serverJson) {
       self.saving = false;
       if (self.discardNextServerResponse) {
         self.discardNextServerResponse = false;
@@ -331,9 +332,15 @@ ResourceShadow.prototype.onLoadError = function(err) {
   this.emit('loaderror', err);
 };
 
-ResourceShadow.prototype.goOnline = function(url, headers) {
+ResourceShadow.prototype.goOnline = function(url, saveMethod, headers) {
   if (url) {
     this.url = url;
+  }
+  if (typeof saveMethod === 'string') {
+    this.saveMethod = /post/i.test(saveMethod) ? 'post' : 'put';
+  } else {
+    this.saveMethod = 'put';
+    headers = saveMethod;
   }
   if (headers) {
     this.options.headers = headers;
@@ -347,6 +354,7 @@ ResourceShadow.prototype.reset = function(data) {
     this.discardNextServerResponse = true;
   }
   this.online = false;
+  this.saveMethod = 'put';
   this.mirrorObject(data || {}, this.data);
   this.setLocalStorageValue(this.data);
   this.onChange({
