@@ -257,7 +257,7 @@ ResourceShadow.prototype.mirrorObject = function(source, target) {
     }
   }
   for (name in target) {
-    if (typeof source[name] === 'undefined') {
+    if (source && typeof source[name] === 'undefined') {
       delete target[name];
       changed = true;
     }
