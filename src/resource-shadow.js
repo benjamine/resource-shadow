@@ -222,6 +222,9 @@ ResourceShadow.prototype.mirrorObject = function(source, target) {
   }
   var changed = false;
   function copyMember(source, target, key) {
+    if(!target || !source){
+      return false;
+    }
     var sourceValue = source[key];
     var targetValue = target[key];
     if (targetValue === sourceValue) {
