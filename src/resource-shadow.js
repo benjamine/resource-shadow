@@ -180,6 +180,8 @@ ResourceShadow.prototype.processJsonFromServer = function(serverJson, preJson) {
         serverData = null;
       }
       if (typeof serverData === 'object') {
+        console.log('mirroring....', serverData, this.data);
+
         changed = this.mirrorObject(serverData, this.data);
       }
       if (changed) {
@@ -258,7 +260,7 @@ ResourceShadow.prototype.mirrorObject = function(source, target) {
     }
   }
   for (name in target) {
-    if (source && typeof source[name] === 'undefined') {
+    if (typeof source[name] === 'undefined') {
       delete target[name];
       changed = true;
     }
