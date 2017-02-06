@@ -217,8 +217,8 @@ ResourceShadow.prototype.listenForStorageEvent = function() {
 
 ResourceShadow.prototype.mirrorObject = function(source, target) {
   var self = this;
- if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) {
-       return false;
+  if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) {
+    return false;
   }
   var changed = false;
   function copyMember(source, target, key) {
